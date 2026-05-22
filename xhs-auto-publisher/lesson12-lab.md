@@ -43,63 +43,22 @@ runtime/lobster-notify/<run_id>/login_qr.payload.json
 在飞书中把下面整段发送给龙虾：
 
 ```text
-你现在帮我部署一个 Skill 到云服务器。
+帮我在云服务器上部署并运行一个 Skill。
 
-目标仓库：
-GitHub - DjangoPeng/agentic-ai（xhs-auto-publisher/ 目录）
-https://github.com/DjangoPeng/agentic-ai/tree/main/xhs-auto-publisher
+第一步，一键部署（克隆仓库、安装依赖、初始化环境、写好 .env MODE=draft）：
+curl -fsSL https://raw.githubusercontent.com/DjangoPeng/agentic-ai/main/xhs-auto-publisher/deploy/setup.sh | bash
 
-目标机器信息：
-- Ubuntu 24.04.4 LTS
-- root 用户
-- 项目部署目录：~/projects/xhs-auto-publisher
+第二步，运行：
+bash ~/projects/xhs-auto-publisher/deploy/run_with_xvfb.sh
 
-部署要求：
-1. 从 GitHub 拉取仓库到 `~/projects/xhs-auto-publisher`
-2. 执行项目自带的系统依赖安装脚本：
-   `bash ~/projects/xhs-auto-publisher/deploy/install_system_ubuntu.sh`
-3. 执行项目自带的初始化脚本：
-   `cd ~/projects/xhs-auto-publisher && bash deploy/bootstrap_project.sh`
-4. 复制环境变量模板：
-   `cd ~/projects/xhs-auto-publisher && cp deploy/env.example .env`
-5. 这次先不要改复杂配置，不需要 nginx，不需要 `XHS_PUBLIC_RUNTIME_BASE_URL`
-6. 这次只做“可运行性验证”，不要真的发布内容；把 `.env` 里的 `MODE` 设为 `draft`
-7. 执行一次手动测试：
-   `cd ~/projects/xhs-auto-publisher && bash deploy/run_with_xvfb.sh`
-8. 运行后检查以下文件是否生成：
-   - `runtime/runs/<run_id>/screenshots/login_qr.png`
-   - `runtime/lobster-notify/<run_id>/login_qr.payload.json`
-9. 如果已经生成二维码截图和 payload，就说明部署成功
-10. 暂时先不要配置 systemd，先把手动验证跑通再说
+每完成一步回报结果。
 
-重要说明：
-- 这个项目当前只走一条链路：生成二维码截图 -> 生成 payload -> 后续由龙虾把图片发到飞书群
-- 不要再额外配置公网二维码访问
-- 不要引入 nginx 方案
-- 不要删除仓库里的文档和示例文件
-- 不要修改核心逻辑，除非遇到明确报错并且必须修复
-
-你执行时请严格按步骤来，每完成一步就回报：
-1. 执行了什么命令
-2. 成功还是失败
-3. 关键输出是什么
-4. 如果失败，贴核心报错
-5. 当前卡在哪一步
-
-验收标准：
-- 项目目录已正确部署到 `~/projects/xhs-auto-publisher`
-- `.venv` 创建成功
-- Playwright Chromium 安装成功
-- 能成功跑起测试
-- 成功生成 `login_qr.png`
-- 成功生成 `login_qr.payload.json`
-
-如果测试跑到需要扫码登录这一步，执行以下操作：
+跑到需要扫码登录时：
 1. 读取 ~/projects/xhs-auto-publisher/runtime/lobster-notify/<run_id>/login_qr.payload.json
 2. 取出 delivery.path 字段对应的图片文件
 3. 把那张二维码图片直接发到飞书群（图片消息，不是路径文字）
 4. 把 delivery.caption_lines 的内容作为说明文字一并发出
-5. 等待用户确认扫码完成后再继续执行
+5. 等待我确认扫码完成后再继续执行
 ```
 
 ### 确认要点
