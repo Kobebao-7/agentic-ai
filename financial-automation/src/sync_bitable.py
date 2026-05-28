@@ -340,7 +340,7 @@ def build_transport_record(document: dict[str, Any], attachment_payload: list[di
         TRANSPORT_FIELD_NAMES["seat_no"]: passenger.get("seat_no"),
         TRANSPORT_FIELD_NAMES["seat_class"]: passenger.get("seat_class"),
         TRANSPORT_FIELD_NAMES["validation_status"]: _map_validation_status(validation.get("status")),
-        TRANSPORT_FIELD_NAMES["needs_review"]: bool(review.get("needs_review")),
+        TRANSPORT_FIELD_NAMES["needs_review"]: _map_review_flag(review.get("needs_review")),
         TRANSPORT_FIELD_NAMES["review_reasons"]: _format_review_reasons(review.get("reasons")),
     }
     return _drop_none(fields)
@@ -374,10 +374,10 @@ def build_expense_record(document: dict[str, Any], attachment_payload: list[dict
         EXPENSE_FIELD_NAMES["quantity"]: first_item.get("quantity"),
         EXPENSE_FIELD_NAMES["unit_price"]: first_item.get("unit_price"),
         EXPENSE_FIELD_NAMES["line_amount"]: first_item.get("line_amount"),
-        EXPENSE_FIELD_NAMES["tax_rate"]: first_item.get("tax_rate"),
+        EXPENSE_FIELD_NAMES["tax_rate"]: _normalize_tax_rate(first_item.get("tax_rate")),
         EXPENSE_FIELD_NAMES["tax_amount"]: first_item.get("tax_amount"),
         EXPENSE_FIELD_NAMES["validation_status"]: _map_validation_status(validation.get("status")),
-        EXPENSE_FIELD_NAMES["needs_review"]: bool(review.get("needs_review")),
+        EXPENSE_FIELD_NAMES["needs_review"]: _map_review_flag(review.get("needs_review")),
         EXPENSE_FIELD_NAMES["review_reasons"]: _format_review_reasons(review.get("reasons")),
     }
     return _drop_none(fields)
@@ -429,6 +429,21 @@ def _map_expense_type_label(value: Any) -> str:
 def _map_validation_status(value: Any) -> str:
     raw = str(value or "").strip().lower()
     return VALIDATION_STATUS_LABELS.get(raw, raw or "⚪ 未知")
+
+
+def _map_review_flag(value: Any) -> str:
+    return "是" if bool(value) else "否"
+
+
+def _normalize_tax_rate(value: Any) -> float | Any:
+    if isinstance(value, str):
+        raw = value.strip()
+        if raw.endswith("%"):
+            try:
+                return float(raw[:-1]) / 100.0
+            except ValueError:
+                return value
+    return value
 
 
 def _build_attachment_text(source_file_name: Any) -> str:
