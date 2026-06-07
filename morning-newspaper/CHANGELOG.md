@@ -1,5 +1,13 @@
 # Changelog
 
+## README 快速开始优化
+
+- 新增"前置条件"段，列出 Python 版本、OpenClaw、GitHub Token、IMAP 授权码的依赖关系和可选性
+- "快速开始"拆分为三步递进：环境准备 → 单步采集验证 → 完整流水线
+- 第二步增加 `--skip-tavily` 采集和 `enrich_content.py` 正文抓取，让学生在不依赖 OpenClaw 的情况下看到真实数据
+- 第三步改用 `run_daily_pipeline.py` 替代深层嵌套的 skill 入口脚本
+- 明确说明三个 LLM 回填文件缺失时的报错行为，不再用"停住"这种模糊描述
+
 ## 项目重命名
 
 将遗留的 `v2` / `Morning-Newspaper-Manager` 命名统一为 `morning-newspaper`。

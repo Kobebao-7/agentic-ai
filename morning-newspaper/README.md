@@ -29,28 +29,58 @@ sources.yaml → collect_raw → enrich_content
 | **三种采集范式** | 结构化 API（GitHub Search API）/ 动态搜索回填（Tavily 搜索计划）/ 私有状态读取（IMAP 邮箱事件队列） |
 | **LLM 任务拆分方法** | 三道关口各自只做一件事——粗筛只看标题、成稿才读正文、精排不重新写稿；每个产物可独立检查、独立重跑 |
 
+## 前置条件
+
+| 条件 | 说明 |
+|---|---|
+| Python 3.9+ | 虚拟环境管理和依赖安装 |
+| OpenClaw 已部署 | 龙虾正常对话，用于三道 LLM 关口和 Tavily 搜索 Skill |
+| GitHub Token（可选） | 不配置可跑，但 GitHub API 匿名速率较低 |
+| IMAP 邮箱授权码（可选） | 不配置自动跳过邮箱提醒，不影响主流程 |
+
 ## 快速开始
 
-```bash
-# 1. 进入项目
-cd morning-newspaper
+分三步递进——环境准备、单步采集验证、完整流水线。跑通前两步即可掌握本节 80% 的内容。
 
-# 2. 创建虚拟环境
+### 第一步：环境准备
+
+```bash
+cd morning-newspaper
 python3 -m venv .venv
 source .venv/bin/activate
-
-# 3. 安装依赖
 pip install -r requirements.txt
-
-# 4. 查看采集计划（不请求网络）
-python scripts/collect_raw.py --dry-run
-
-# 5. 运行完整编排入口
-python skills/morning-newspaper-assistant-skill/scripts/run_morning_report.py \
-    --project-root $(pwd)
+cp .env.example .env
+# 编辑 .env，按需填入 GITHUB_TOKEN 和邮箱授权码
 ```
 
-编排入口会按流水线顺序执行，遇到缺少模型回填文件时停住并提示缺少哪一步。跑通采集和正文抓取即可掌握本节 80% 的内容。
+### 第二步：单步采集验证
+
+```bash
+# 查看采集计划（不请求网络，确认配置正确）
+python scripts/collect_raw.py --dry-run
+
+# 实际采集（GitHub、HN、RSS 无需额外配置即可运行）
+python scripts/collect_raw.py --skip-tavily
+
+# 正文抓取
+python scripts/enrich_content.py
+```
+
+采集完成后检查 `runtime/collected_raw.json`，应看到来自 GitHub、Hacker News、RSS 的真实候选条目。`--skip-tavily` 跳过需要 OpenClaw Skill 的 Tavily 搜索，方便本地独立验证。
+
+### 第三步：完整流水线
+
+```bash
+python scripts/run_daily_pipeline.py
+```
+
+流水线按七步顺序执行。前三步（采集、正文抓取、准备粗筛输入）完成后，脚本会检查三个 LLM 回填文件是否存在：
+
+- `runtime/title_shortlist_result.json`（标题粗筛结果）
+- `runtime/draft_result.json`（中文成稿结果）
+- `runtime/top10_ranking_result.json`（Top10 精排结果）
+
+这三个文件由 OpenClaw 在执行 Skill 时自动生成。如果缺失，脚本报错并指出缺少哪一步，不会静默跳过。完整的 Skill 驱动流程参见 `lesson14-lab.md` 实验手册。
 
 ## 核心模块
 
