@@ -54,7 +54,15 @@ python scripts/crm_assistant.py process-transcript \
   --output-dir runtime/quick_start
 ```
 
-跑通本地验证即可掌握本节 80% 的内容。真实写表需要飞书配置，详见 [lesson15-lab.md](lesson15-lab.md)。
+跑通本地验证即可掌握本节 80% 的内容。真实写表需要飞书配置，详见下方"飞书写表"章节或 [lesson15-lab.md](lesson15-lab.md)。
+
+环境变量模板：
+
+```bash
+cp .env.example .env.local
+# 填入真实值后：
+set -a && source .env.local && set +a
+```
 
 ## 四段式架构
 
@@ -168,11 +176,19 @@ python scripts/crm_assistant.py run-customer-journey \
 }
 ```
 
-## 飞书写表
+## 飞书配置
 
-### 配置
+飞书凭证支持三种传入方式，优先级从高到低：CLI 参数 > `feishu_config.json` > 环境变量。
 
-在项目根目录创建 `feishu_config.json`：
+推荐使用环境变量（与第 13/14 节一致）：
+
+```bash
+cp .env.example .env.local
+# 填入真实值后：
+set -a && source .env.local && set +a
+```
+
+也可以使用 `feishu_config.json`（适合龙虾对话模式）：
 
 ```json
 {
@@ -184,13 +200,17 @@ python scripts/crm_assistant.py run-customer-journey \
 }
 ```
 
+> 两种方式不要混用。`.env.local` 和 `feishu_config.json` 都已在 `.gitignore` 中，不会被误提交。
+
+## 飞书写表
+
 ### 检查表结构
 
 ```bash
 python scripts/crm_assistant.py inspect-feishu-bitable \
-  --app-id cli_xxxxxxxx \
-  --app-secret xxxxxxxx \
-  --app-token-or-url xxxxxxxx \
+  --app-id $FEISHU_APP_ID \
+  --app-secret $FEISHU_APP_SECRET \
+  --app-token-or-url $FEISHU_BITABLE_APP_TOKEN \
   --output-dir runtime/inspect
 ```
 
@@ -199,7 +219,6 @@ python scripts/crm_assistant.py inspect-feishu-bitable \
 ```bash
 python scripts/crm_assistant.py sync-feishu-bitable \
   --crm-packet-path runtime/your_case/crm_packet.json \
-  --config-path feishu_config.json \
   --output-dir runtime/dry_run \
   --dry-run
 ```
@@ -209,7 +228,6 @@ python scripts/crm_assistant.py sync-feishu-bitable \
 ```bash
 python scripts/crm_assistant.py sync-feishu-bitable \
   --crm-packet-path runtime/your_case/crm_packet.json \
-  --config-path feishu_config.json \
   --output-dir runtime/write_once
 ```
 
@@ -218,8 +236,7 @@ python scripts/crm_assistant.py sync-feishu-bitable \
 ```bash
 python scripts/crm_assistant.py ingest-feishu-raw-to-bitable \
   --raw-input-path assets/feishu_raw/your_feishu_raw.json \
-  --output-dir runtime/ingest/your_case \
-  --config-path feishu_config.json
+  --output-dir runtime/ingest/your_case
 ```
 
 自动完成：提取 context → 生成 transcript → 生成 CRM 结果 → upsert 客户表 → append 商机表。
@@ -276,6 +293,7 @@ CRM-Assistant/
 ├── skills/
 │   └── crm-assistant/
 │       └── SKILL.md                             # OpenClaw Skill 入口契约
+├── .env.example                                 # 环境变量模板（飞书凭证 + Bitable 表配置）
 ├── lesson15-lab.md                              # 第 15 节实验手册
 ├── requirements.txt
 └── README.md

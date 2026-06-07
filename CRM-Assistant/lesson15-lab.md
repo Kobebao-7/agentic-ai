@@ -62,12 +62,14 @@ OpportunitySnapshots 字段：
 2. 进入 CRM-Assistant/ 子目录
 3. 创建 Python 虚拟环境 .venv（如已存在跳过）
 4. 安装 requirements.txt
-5. 确认 CRM-Assistant 的命令行入口可以正常打开帮助信息
+5. 从 .env.example 复制出 .env.local（如已存在跳过）
+6. 确认 CRM-Assistant 的命令行入口可以正常打开帮助信息
 
 完成后告诉我：
 - git pull 是否成功（有无新的提交拉下来）
 - .venv 虚拟环境是否已新建或确认可用
 - 依赖是否安装成功
+- .env.local 是否已存在或已创建
 - CRM-Assistant 的帮助信息是否能正常输出
 ```
 
@@ -78,27 +80,21 @@ OpportunitySnapshots 字段：
 ## 3. 配置环境（发给龙虾）
 
 > **⚠️ 发送前先自己填好真实值，不要把占位符发出去。**
-> - `app_id` / `app_secret`：飞书开放平台 → 应用详情页获取
-> - `app_token`：第 1 步龙虾返回的 `app_token`
-> - `customer_table_id`：Customers 的 `table_id`
-> - `opportunity_snapshot_table_id`：OpportunitySnapshots 的 `table_id`
+> - `FEISHU_APP_ID` / `FEISHU_APP_SECRET`：飞书开放平台 → 应用详情页获取
+> - `FEISHU_BITABLE_APP_TOKEN`：第 1 步龙虾返回的 `app_token`
+> - `FEISHU_CUSTOMER_TABLE_ID`：Customers 的 `table_id`
+> - `FEISHU_OPPORTUNITY_TABLE_ID`：OpportunitySnapshots 的 `table_id`
 
 把你的真实值替换进去，发送：
 
 ```text
-请在 ~/projects/agentic-ai/CRM-Assistant/feishu_config.json 写入下面的配置：
+请把 ~/projects/agentic-ai/CRM-Assistant/.env.local 配成：
 
-app_id：cli_xxxxxxxx
-app_secret：xxxxxxxx
-app_token：xxxxxxxx
-customer_table_id：tblxxxxxxxx
-opportunity_snapshot_table_id：tblxxxxxxxx
-
-写入后请确认：
-1. 文件路径正确
-2. JSON 格式合法
-3. 所有字段都不是空值
-4. 没有把 cli_xxxxxxxx 或 xxxxxxxx 这样的占位符原样写进去
+FEISHU_APP_ID=cli_xxxxxxxx
+FEISHU_APP_SECRET=xxxxxxxx
+FEISHU_BITABLE_APP_TOKEN=xxxxxxxx
+FEISHU_CUSTOMER_TABLE_ID=tblxxxxxxxx
+FEISHU_OPPORTUNITY_TABLE_ID=tblxxxxxxxx
 ```
 
 ---
@@ -134,7 +130,7 @@ opportunity_snapshot_table_id：tblxxxxxxxx
 
 项目目录：~/projects/agentic-ai/CRM-Assistant
 
-请先读取 feishu_config.json 里的 app_id、app_secret 和 app_token，然后用 inspect-feishu-bitable 命令的 --app-id、--app-secret、--app-token-or-url 参数传入（这个命令不支持 --config-path，需要分别传参）。
+请先加载 .env.local，然后用 inspect-feishu-bitable 命令的 --app-id、--app-secret、--app-token-or-url 参数传入对应的环境变量值。
 
 检查结果请保存到 runtime/lab15_feishu/ 下面。
 
@@ -157,7 +153,7 @@ dry-run 会生成写表计划，但不会真实写入飞书。
 ```text
 请用 CRM-Assistant 做一次飞书写表 dry-run。
 
-请使用第 4 步生成的 crm_packet.json 和第 3 步配置好的 feishu_config.json。这一步只生成写表计划，不要真实写入飞书。输出结果请保存到 runtime/lab15_feishu/dry_run。
+请使用第 4 步生成的 crm_packet.json 和第 3 步配置好的 .env.local。这一步只生成写表计划，不要真实写入飞书。输出结果请保存到 runtime/lab15_feishu/dry_run。
 
 执行完后告诉我：
 1. feishu_sync_result.json 是否已生成
@@ -177,7 +173,7 @@ dry-run 会生成写表计划，但不会真实写入飞书。
 ```text
 请用 CRM-Assistant 把本次 CRM 结果真实写入飞书多维表格。
 
-请使用第 4 步生成的 crm_packet.json 和第 3 步配置好的 feishu_config.json。这一次请真实写入飞书：Customers 表按客户 ID 新增或更新，OpportunitySnapshots 表追加一条商机推进快照。输出结果请保存到 runtime/lab15_feishu/write_once。
+请使用第 4 步生成的 crm_packet.json 和第 3 步配置好的 .env.local。这一次请真实写入飞书：Customers 表按客户 ID 新增或更新，OpportunitySnapshots 表追加一条商机推进快照。输出结果请保存到 runtime/lab15_feishu/write_once。
 
 执行完成后告诉我：
 1. 是否写入成功
@@ -200,7 +196,7 @@ dry-run 会生成写表计划，但不会真实写入飞书。
 
 项目目录：~/projects/agentic-ai/CRM-Assistant
 
-请使用样本 assets/feishu_raw/pingan_longxiahezi_need_confirmation.json 和配置文件 feishu_config.json，一次性完成：提取 context、生成 transcript、生成 CRM 结果、写入飞书两张表。输出目录请放到 runtime/lab15_ingest/pingan_need_confirmation。
+请使用样本 assets/feishu_raw/pingan_longxiahezi_need_confirmation.json 和环境变量文件 .env.local，一次性完成：提取 context、生成 transcript、生成 CRM 结果、写入飞书两张表。输出目录请放到 runtime/lab15_ingest/pingan_need_confirmation。
 
 完成后告诉我：
 1. build_result_path 是否生成
@@ -266,7 +262,7 @@ CRM_ASSISTANT_ROOT=~/projects/agentic-ai/CRM-Assistant
 - [ ] 龙虾 git pull 并初始化 CRM-Assistant 成功
 - [ ] `python scripts/crm_assistant.py --help` 能正常输出
 - [ ] 飞书 Base 已创建，包含 Customers 和 OpportunitySnapshots 两张表
-- [ ] `feishu_config.json` 已配置真实 App ID / App Secret / app_token / table_id
+- [ ] `.env.local` 已配置真实 FEISHU_APP_ID / FEISHU_APP_SECRET / FEISHU_BITABLE_APP_TOKEN / table_id
 - [ ] 本地样本生成 `context.json`、`transcript.txt`、`crm_packet.json`
 - [ ] 本地样本生成 `customer_table_row.json` 和 `opportunity_snapshot_row.json`
 - [ ] `inspect-feishu-bitable` 能读到两张表字段
@@ -283,10 +279,10 @@ CRM_ASSISTANT_ROOT=~/projects/agentic-ai/CRM-Assistant
 
 | 龙虾报的错 | 原因 | 你发什么 |
 |---|---|---|
-| `Missing Feishu app token` | 没传 app_token 或配置文件字段名不对 | 「请检查 feishu_config.json 里是否有 app_token」 |
-| `Missing customer table id` | Customers 表 ID 缺失 | 「请把 Customers 的 table_id 写入 customer_table_id」 |
-| `Missing opportunity table id` | OpportunitySnapshots 表 ID 缺失 | 「请把 OpportunitySnapshots 的 table_id 写入 opportunity_snapshot_table_id」 |
-| `tenant_access_token missing` | App ID / App Secret 错误或应用未发布 | 「请重新核对飞书应用的 App ID / App Secret」 |
+| `Missing Feishu app token` | 没加载 .env.local 或变量名不对 | 「请检查 .env.local 里是否有 FEISHU_BITABLE_APP_TOKEN」 |
+| `Missing customer table id` | Customers 表 ID 缺失 | 「请检查 .env.local 里是否有 FEISHU_CUSTOMER_TABLE_ID」 |
+| `Missing opportunity table id` | OpportunitySnapshots 表 ID 缺失 | 「请检查 .env.local 里是否有 FEISHU_OPPORTUNITY_TABLE_ID」 |
+| `tenant_access_token missing` | App ID / App Secret 错误或应用未发布 | 「请重新核对 .env.local 里的 FEISHU_APP_ID / FEISHU_APP_SECRET」 |
 | `Feishu API failed` | 权限、表 ID 或字段类型不匹配 | 「请返回完整报错，并重新执行 inspect-feishu-bitable」 |
 | 字段缺失 | 建表时字段名和脚本字段不一致 | 「请按实验手册第 1 步补齐缺失字段，字段名保持完全一致」 |
 | 只生成 JSON 没写表 | 跑的是本地处理命令或带了 `--dry-run` | 「请确认执行的是 sync-feishu-bitable 且没有 --dry-run」 |

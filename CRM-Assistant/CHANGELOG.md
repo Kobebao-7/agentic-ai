@@ -1,5 +1,12 @@
 # Changelog
 
+### 环境变量配置统一
+
+- 新增 `.env.example` 环境变量模板，与第 13/14 节格式统一（`cp .env.example .env.local`）
+- 实验手册第 3 步从 `feishu_config.json` 改为 `.env.local`，部署步骤新增 `.env.local` 创建
+- README 飞书配置章节新增 `.env.local` 作为推荐方式，保留 `feishu_config.json` 作为备选
+- 验收清单和常见问题速查表统一引用 `.env.local` 变量名
+
 ### README.md — 全面重写
 
 - 对齐第 15 节 PPT 文稿，以"四段式架构（接入→理解→判断→沉淀）"为主线重组全文

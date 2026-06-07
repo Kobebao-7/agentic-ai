@@ -22,4 +22,5 @@ venv/
 # Optional local environment / config files
 .env
 .env.*
+!.env.example
 feishu_config.json
