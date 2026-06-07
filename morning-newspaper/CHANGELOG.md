@@ -1,5 +1,16 @@
 # Changelog
 
+## 实验手册重写与 Skill 注册对齐
+
+- `lesson14-lab.md` — 全文重写，对齐第 13 节 financial-automation 的飞书对话驱动模式：
+  - 部署方式从 clone 独立仓库改为 `git pull` 课程仓库 + 进入子目录
+  - 所有路径从 `/root/projects/Morning-Newspaper-Assistant` 统一为 `~/projects/agentic-ai/morning-newspaper`
+  - 新增第 2 步环境变量配置（GitHub Token + Tavily API Key + IMAP）
+  - 新增第 3 步采集验证（`--skip-tavily` 单步验证）
+  - 新增第 7 步 Skill 注册（复制目录 + 配置 `MORNING_NEWSPAPER_ROOT`）
+  - 移除所有 Morning-Newspaper-Manager 混用警告
+- `SKILL.md` — 新增项目依赖段（三级路径查找），移除 Manager 引用和硬编码 IP
+
 ## 补充 Tavily 搜索配置文档
 
 - `.env.example` — 新增 `TAVILY_API_KEY` 条目及注册说明

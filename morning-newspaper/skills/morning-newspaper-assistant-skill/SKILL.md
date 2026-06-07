@@ -1,20 +1,33 @@
 ---
 name: morning-newspaper-assistant-skill
-description: 当 OpenClaw 需要运行 Morning-Newspaper-Assistant 的稳定 AI 晨报链路，生成 Top10 页面数据，并附带邮箱提醒侧栏时使用。
+description: 当用户希望生成 AI 早报、运行晨报链路、查看今日资讯摘要，或消息中包含”早报””晨报””今日资讯””新闻摘要”等关键词时触发。
 ---
 
 # Morning Newspaper Assistant Skill
 
 当用户希望运行中文 AI 晨报助手链路、生成 `top10_publishable.json`、输出静态页面、启动 8510 固定链接，或者排查邮箱提醒与成稿稳定性时，使用本 Skill。
 
-## 当前稳定目标
+## 项目依赖
 
-这套 Skill 的目标不是“尽量跑出点东西”，而是保证：
+这个 Skill 依赖完整项目仓库，不能只拷贝 `SKILL.md` 单独使用。
+
+按以下顺序定位项目根目录：
+1. 环境变量 `MORNING_NEWSPAPER_ROOT`
+2. `~/projects/agentic-ai/morning-newspaper`
+3. `~/.openclaw/workspace/morning-newspaper`
+
+若这些路径都不存在，应明确告诉用户：当前环境尚未部署完整项目仓库，请先完成部署。
+
+主要入口：
+- `<repo_root>/scripts/run_daily_pipeline.py`
+- `<repo_root>/config/sources.yaml`
+
+## 稳定目标
 
 1. `runtime/top10_publishable.json` 稳定为 **10 条**
 2. `runtime/dashboard.html` 稳定可生成
-3. 8510 固定链接稳定指向 **Assistant** 项目，而不是旧 Manager 页面
-4. 右侧“今日待办提醒”优先读取真实邮箱结果，而不是占位 JSON
+3. 8510 固定链接稳定可用
+4. 右侧”今日待办提醒”优先读取真实邮箱结果，而不是占位 JSON
 5. 如果 IMAP 连通但收不到新邮件，自动继续走 **POP3 fallback**
 
 ## 稳定工作流
@@ -73,7 +86,7 @@ python3 scripts/run_daily_pipeline.py --rebuild-dashboard-only
 
 这个脚本会：
 - 停掉已有的 8510 服务实例
-- 启动 `Morning-Newspaper-Assistant/runtime/static_dashboard_server.py`
+- 启动 `runtime/static_dashboard_server.py`
 
 ## 人工或模型回填点
 
@@ -121,7 +134,7 @@ IMAP_PASS=your_imap_authorization_code
 ## 页面输出
 
 - 静态页面：`runtime/dashboard.html`
-- 固定分享链接：`http://101.47.152.44:8510/dashboard.html`
+- 固定分享链接：`http://<服务器IP>:8510/dashboard.html`
 - Streamlit 看板入口：`dashboard_app.py`
 
 ## 回复要求
@@ -130,6 +143,6 @@ IMAP_PASS=your_imap_authorization_code
 
 - 当前链路完成到了哪一步
 - `runtime/dashboard.html` 是否已更新
-- 8510 是否已指向 Assistant 页面
+- 8510 页面服务是否正常
 - 采集总数、候选池数量、成稿数量、Top10 数量、邮箱提醒数量、异常来源数量
 - 如果缺少模型回填文件，明确指出缺的是哪一个
