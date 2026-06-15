@@ -1,313 +1,261 @@
 # CRM Assistant
 
-> 配套课程：AI 业务流架构师 · 第 15 节《实战：让每一场高价值会议，自动沉淀为可经营的 CRM 资产》
+面向销售 / 私域 CRM 跟进场景的会议理解与飞书落表项目。
 
-把会议转录文本或飞书会议原始数据，经过四段式架构（接入 → 理解 → 判断 → 沉淀），转换成客户画像、商机推进判断、跟进任务与会前简报，最终写入飞书多维表格两张表。
+当前项目已经统一为一个 Python CLI：`scripts/crm_assistant.py`。
+它负责把会议文本、飞书会议原始 JSON、飞书云文档正文、Word/DOCX 会议纪要，转换成 CRM 结构化结果，并在具备凭据时同步到飞书多维表格。
 
-```
-会议原始数据 / 转录文本
-  → 接入：build-context-from-feishu 拆成 context.json + transcript.txt
-  → 理解：从对话里提取需求、顾虑、MBTI、沟通风格等经营信号
-  → 判断：生成阶段、Lead Score、意向等级、推荐动作
-  → 沉淀：upsert 客户信息表 + append 商机推进快照表
-```
+---
 
-## 与课程的关系
+## 1. 当前项目状态
 
-本项目是第 15 节的实战代码，服务于课程的三个核心留存物：
+本项目当前已经和真实链路对齐，核心能力包括：
 
-| 留存物 | 在本项目中的体现 |
-|---|---|
-| **四段式架构** | 接入（标准化输入）→ 理解（信号提取）→ 判断（策略生成）→ 沉淀（CRM 写入）——不是一个 Prompt，是一套业务能力 |
-| **Prompt + Schema + few-shot 三件套** | `llm_prompt_template.md` 定判断标准 + `llm_output_schema.md` 约束输出结构 + 两份 few-shot 示例强化难点字段（MBTI、是否单身、风险顾虑） |
-| **历史强值保护** | `merge_row_preserving_existing_values` —— 本轮弱值不覆盖历史强值，多轮画像越跑越准而非越跑越空 |
+- `transcript + context` 规则处理
+- 飞书会议原始 JSON -> CRM
+- 飞书云文档正文 -> CRM
+- Word / DOCX -> CRM
+- CRM 结果 -> 飞书 `Customers` / `OpportunitySnapshots` 两表
+- 多轮客户推进追踪
+- Customers 字段“弱值不覆盖强值”更新规则
+- `沟通风格` / `风险顾虑` 字段合并策略
+- 飞书字段类型转换（尤其日期时间 -> 毫秒时间戳）
+- 支持在 app 权限不足时，改走**用户权限**直接写入飞书多维表格
 
-## 前置条件
+> 当前最贴近真实使用方式的链路：**Word / DOCX -> CRM Assistant -> 用户权限写入飞书表**。
 
-| 条件 | 说明 |
-|---|---|
-| Python 3.10+ | 无第三方依赖，标准库即可运行 |
-| 飞书开发者应用 | 有 App ID / App Secret，已开通多维表格相关权限 |
-| 飞书多维表格 | 包含客户信息和商机快照两张表 |
+---
 
-## 快速开始
+## 2. 当前在用的飞书表
 
-```bash
-# 1. 进入项目
-cd CRM-Assistant
+飞书凭据与表 ID 通过 `.env.local` 配置，不写入仓库：
 
-# 2. 创建虚拟环境
-python3 -m venv .venv
-source .venv/bin/activate
+- `FEISHU_BITABLE_APP_TOKEN`: Base 的 app_token
+- `FEISHU_CUSTOMER_TABLE_ID`: Customers 的 table_id
+- `FEISHU_OPPORTUNITY_TABLE_ID`: OpportunitySnapshots 的 table_id
 
-# 3. 安装依赖
-pip install -r requirements.txt
+### 2.1 Customers
+长期客户画像表，按客户身份更新。
 
-# 4. 本地验证（不需要飞书配置）
-python scripts/crm_assistant.py build-context-from-feishu \
-  --raw-input-path assets/feishu_raw/pingan_longxiahezi_need_confirmation.json \
-  --output-dir runtime/quick_start
+当前真实字段：
+- 客户ID（主字段 / Primary）
+- 客户名称
+- 客户公司
+- 行业
+- MBTI
+- 是否单身
+- 沟通风格
+- 成交阻力
+- 价格敏感程度
+- 风险顾虑
+- 客户画像摘要
+- 客户负责人
+- 最后更新时间（DateTime）
+- 数据来源
+- 职务
 
-python scripts/crm_assistant.py process-transcript \
-  --transcript-path runtime/quick_start/transcript.txt \
-  --context-path runtime/quick_start/context.json \
-  --output-dir runtime/quick_start
-```
+### 2.2 OpportunitySnapshots
+每次会议一条商机快照，不覆盖历史。
 
-跑通本地验证即可掌握本节 80% 的内容。真实写表需要飞书配置，详见下方"飞书写表"章节或 [lesson15-lab.md](lesson15-lab.md)。
+当前真实字段：
+- 商机ID（主字段 / Primary）
+- 客户ID
+- 客户名称
+- 客户公司
+- 机会名称
+- 商机描述
+- 当前阶段
+- Lead Score（Number）
+- 意向等级
+- 高净值优先（Checkbox）
+- 销售区域
+- 业务价值
+- 推荐动作
+- 最新进展
+- 下次跟进时间（DateTime）
+- 最近会议时间（DateTime）
+- 商机负责人
+- 数据来源
 
-环境变量模板：
+命名建议：
+- `机会名称` 应优先采用 **`客户公司 - 项目主题`**
+- 不要把联系人姓名列表硬拼到最前面
+- 客户身份已经通过 `客户名称`、`客户公司`、`客户ID` 单独表达，不需要在 `机会名称` 再重复一次
 
-```bash
-cp .env.example .env.local
-# 填入真实值后：
-set -a && source .env.local && set +a
-```
+---
 
-## 四段式架构
+## 3. 关键业务规则
 
-### 第一段 · 接入：标准化输入
+### 3.1 Customers 字段更新规则
+Customers 的所有字段统一遵守：
 
-把飞书 raw JSON 拆成两个文件，让下游所有处理吃同一种"标准化输入"：
+- 如果本轮值是弱值：`未明确` / `未知` / `待确认` / 空值
+  - **不要覆盖**历史上已经明确的旧值
+- 如果本轮值是新的明确判断
+  - **允许更新**旧值
 
-- `context.json`（14 个固定字段）：客户 ID、商机 ID、负责人、会议时间、销售区域……
-- `transcript.txt`（纯文本）：整段会议对话
+### 3.2 合并字段
+以下字段采用“保留旧值 + 补充新值 + 去重”策略：
+- 沟通风格
+- 风险顾虑
 
-```bash
-python scripts/crm_assistant.py build-context-from-feishu \
-  --raw-input-path assets/feishu_raw/your_feishu_raw.json \
-  --output-dir runtime/your_case
-```
+### 3.3 Customers 命中规则
+当前项目已经改为：
+- 优先按 `客户ID` 命中已有飞书记录
+- 若缺少正式 `客户ID`，再回退到 `客户名称 + 客户公司`
 
-### 第二段 · 理解：经营信号提取
+### 3.4 商机快照
+商机快照表按会议轮次追加，用于保留推进轨迹，例如：
+- 需求确认
+- 方案沟通
+- 推进中
+- 待成交
+- 已成交
 
-从对话原文中提炼结构化经营信号：
+### 3.5 商机ID 继承规则
+如果是**同一个客户、同一个项目、只是推进到了不同阶段**，应优先沿用**同一个商机ID**，并在 `OpportunitySnapshots` 中追加新的阶段快照。
 
-- 客户画像：MBTI、是否单身、沟通风格
-- 风险顾虑：价格敏感、交付风险、合规与数据安全
-- 决策角色：客户本人拍板？配偶参与？技术决策人引入？
+只有在以下情况更适合生成新的商机ID：
+- 同一客户下的全新项目
+- 不同预算包 / 不同采购线
+- 已经明确是另一条独立需求线
 
-### 第三段 · 判断：策略生成
+换句话说：
+- **阶段变化** → 同一个商机ID，不同快照
+- **新项目** → 新商机ID
 
-把经营信号翻译成销售动作：
+---
 
-| 输出字段 | 示例值 | 经营含义 |
-|---|---|---|
-| 当前阶段 | 需求确认 | 这单走到哪了 |
-| Lead Score | 82 | 推进成熟度（0-100） |
-| 意向等级 | high | 飞书表快速筛选 |
-| 推荐动作 | 补齐关键需求并推动方案 | 下一步该做什么 |
-| 下次跟进 | 2026-05-21 15:00 | 什么时候约下次会 |
+## 4. CLI 子命令
 
-### 第四段 · 沉淀：写入飞书两张表
-
-| 飞书表 | 写入方式 | 回答的问题 |
-|---|---|---|
-| 客户信息 | upsert（同 ID 更新） | 这个客户是谁？该怎么跟他沟通？ |
-| 商机快照 | append（每轮追加） | 这单现在在哪？下一步该怎么推？ |
-
-## 核心模块
-
-| 模块 | 职责 |
-|---|---|
-| `scripts/crm_assistant.py` | Python CLI 主入口，12 个子命令覆盖完整链路 |
-| `references/llm_prompt_template.md` | Prompt 模板：每个字段的判断标准、证据来源、边界条件 |
-| `references/llm_output_schema.md` | Schema 约束：输出 JSON 结构、字段名、枚举值、类型 |
-| `assets/few_shot/` | few-shot 示范：覆盖 MBTI、是否单身、风险顾虑等难点字段 |
-| `assets/feishu_raw/` | 飞书原始会议样本（含中国平安 5 轮推进完整数据） |
-| `references/feishu-bitable-mapping.md` | 飞书两表字段映射与写入规则 |
-| `skills/crm-assistant/SKILL.md` | OpenClaw Skill 入口契约 |
-
-## 8 类结构化产出
-
-一次处理生成 8 个文件，每一类对应一个具体动作：
-
-| 产出文件 | 回答什么 |
-|---|---|
-| `meeting_record.json` | 这次会谈了什么 |
-| `customer_profile_update.json` | 客户是个什么样的人 |
-| `opportunity_update.json` | 这单推进到哪一步了 |
-| `follow_up_task.json` | 下一步该做什么 |
-| `pre_meeting_brief.json` | 下次开会前看什么 |
-| `customer_table_row.json` | 直接写进飞书客户表 |
-| `opportunity_snapshot_row.json` | 直接写进飞书商机表 |
-| `crm_packet.json` | 以上全部打包 |
-
-## 历史强值保护
-
-多轮经营的核心难题：本轮没提到 ≠ 不存在。
-
-```python
-# 本轮弱值 + 历史强值 → 保留历史
-def merge_row_preserving_existing_values(current_row, existing_fields):
-    merged = OrderedDict()
-    for field_name, current_value in current_row.items():
-        existing_value = existing_fields.get(field_name)
-        if is_weak_field_value(current_value) and not is_weak_field_value(existing_value):
-            merged[field_name] = existing_value
-        else:
-            merged[field_name] = current_value
-    return merged
-```
-
-弱值包括：`None`、空字符串、`"未明确"`、`"暂无"`、`"未知"`、`"待确认"`、`"待补充"`、空列表/字典。
-
-## 多轮客户推进
-
-同一客户跨多轮会议持续推进，可查看阶段变化和得分轨迹：
+查看完整帮助：
 
 ```bash
-python scripts/crm_assistant.py run-customer-journey \
-  --manifest-path assets/feishu_raw/your_journey_manifest.json \
-  --output-dir runtime/your_case_journey
+python ./scripts/crm_assistant.py --help
 ```
 
-产出 `journey_summary.json`，包含完整推进故事：
+当前主命令包括：
+- `process-transcript`
+- `build-context-from-feishu`
+- `build-context-from-feishu-doc`
+- `ingest-docx-to-bitable`
+- `build-llm-prompt`
+- `validate-model-output`
+- `convert-model-output`
+- `run-sample-tests`
+- `run-feishu-pipeline-tests`
+- `run-model-output-tests`
+- `run-customer-journey`
+- `inspect-feishu-bitable`
+- `sync-feishu-bitable`
+- `ingest-feishu-raw-to-bitable`
+- `ingest-feishu-doc-to-bitable`
 
-```json
-{
-  "stage_path": ["需求确认", "方案沟通", "推进中", "待成交", "已成交"],
-  "latest_lead_score": 97,
-  "progression_notes": [
-    "r1 需求确认 99", "r2 持平 99",
-    "r3 下降 -4 = 95", "r4 下降 -20 = 75",
-    "r5 提升 +22 = 97"
-  ]
-}
-```
+---
 
-## 飞书配置
+## 5. 常用用法
 
-飞书凭证支持三种传入方式，优先级从高到低：CLI 参数 > `feishu_config.json` > 环境变量。
-
-推荐使用环境变量（与第 13/14 节一致）：
+### 5.1 直接处理 Word / DOCX
 
 ```bash
-cp .env.example .env.local
-# 填入真实值后：
-set -a && source .env.local && set +a
+python ./scripts/crm_assistant.py ingest-docx-to-bitable \
+  --docx-path ./meeting.docx \
+  --output-dir ./runtime/your_case
 ```
 
-也可以使用 `feishu_config.json`（适合龙虾对话模式）：
-
-```json
-{
-  "app_id": "cli_xxxxxxxx",
-  "app_secret": "xxxxxxxx",
-  "app_token": "xxxxxxxx",
-  "customer_table_id": "tblxxxxxxxx",
-  "opportunity_snapshot_table_id": "tblxxxxxxxx"
-}
-```
-
-> 两种方式不要混用。`.env.local` 和 `feishu_config.json` 都已在 `.gitignore` 中，不会被误提交。
-
-## 飞书写表
-
-### 检查表结构
+如果还要继续走 app 权限写表：
 
 ```bash
-python scripts/crm_assistant.py inspect-feishu-bitable \
-  --app-id $FEISHU_APP_ID \
-  --app-secret $FEISHU_APP_SECRET \
-  --app-token-or-url $FEISHU_BITABLE_APP_TOKEN \
-  --output-dir runtime/inspect
+python ./scripts/crm_assistant.py ingest-docx-to-bitable \
+  --docx-path ./meeting.docx \
+  --output-dir ./runtime/your_case \
+  --sync-feishu \
+  --config-path ./feishu_config.json
 ```
 
-### dry-run 模拟写表
+> 注意：如果命令行环境里的 app 权限不足，CLI 侧 `--sync-feishu` 可能会被 Feishu Open API 拒绝。当前项目已经验证过一种更稳的真实路径：**先让 CLI 产出结构化结果，再通过用户权限把结果写进同一套飞书表**。
+
+### 5.2 处理飞书会议原始 JSON
 
 ```bash
-python scripts/crm_assistant.py sync-feishu-bitable \
-  --crm-packet-path runtime/your_case/crm_packet.json \
-  --output-dir runtime/dry_run \
-  --dry-run
+python ./scripts/crm_assistant.py ingest-feishu-raw-to-bitable \
+  --raw-input-path ./raw.json \
+  --output-dir ./runtime/your_case
 ```
 
-### 真实写入
+### 5.3 处理飞书文档正文
 
 ```bash
-python scripts/crm_assistant.py sync-feishu-bitable \
-  --crm-packet-path runtime/your_case/crm_packet.json \
-  --output-dir runtime/write_once
+python ./scripts/crm_assistant.py ingest-feishu-doc-to-bitable \
+  --doc-markdown-path ./source_doc.md \
+  --output-dir ./runtime/your_case
 ```
 
-### 一条命令完整链路
+### 5.4 仅做规则引擎处理
 
 ```bash
-python scripts/crm_assistant.py ingest-feishu-raw-to-bitable \
-  --raw-input-path assets/feishu_raw/your_feishu_raw.json \
-  --output-dir runtime/ingest/your_case
+python ./scripts/crm_assistant.py process-transcript \
+  --transcript-path ./transcript.txt \
+  --context-path ./context.json \
+  --output-dir ./runtime/your_case/process
 ```
 
-自动完成：提取 context → 生成 transcript → 生成 CRM 结果 → upsert 客户表 → append 商机表。
+---
 
-## 飞书表字段
+## 6. 输出文件
 
-### 客户信息表
+常见输出包括：
+- `meeting_record.json`
+- `customer_profile_update.json`
+- `opportunity_update.json`
+- `follow_up_task.json`
+- `pre_meeting_brief.json`
+- `customer_table_rows.json`
+- `opportunity_snapshot_row.json`
+- `crm_packet.json`
 
-客户ID、客户名称、客户公司、行业、MBTI、是否单身、沟通风格、成交阻力、价格敏感程度、风险顾虑、客户画像摘要、客户负责人、最后更新时间、数据来源
+在 ingest 流程里，还会看到：
+- `source_doc.md`
+- `transcript.txt`
+- `context.json`
+- `build_result.json`
+- `ingest_*_result.json`
 
-### 商机快照表
+---
 
-商机ID、客户ID、客户名称、客户公司、机会名称、商机描述、当前阶段、Lead Score、意向等级、高净值优先、销售区域、业务价值、推荐动作、最新进展、下次跟进时间、最近会议时间、商机负责人、数据来源
+## 7. 参考资料
 
-## 完成标准
+按需阅读：
+- `references/input_schemas.md`
+- `references/output_schemas.md`
+- `references/feishu-bitable-mapping.md`
+- `references/llm_prompt_template.md`
+- `references/llm_output_schema.md`
+- `references/openclaw_user_side_write_prompt.md`
+- `references/user_side_feishu_prompt.md`
 
-一次完整成功必须同时满足：
+---
 
-1. `context.json` 和 `transcript.txt` 已生成
-2. `crm_packet.json` 包含 8 类结构化结果
-3. `customer_table_row.json` 弱值已被历史强值保护
-4. 飞书客户信息表有客户画像记录（upsert 成功）
-5. 飞书商机快照表有商机推进快照（append 成功）
+## 8. 当前已知注意点
 
-## 目录结构
+- DOCX 直连入口已经可用
+- 飞书字段类型转换已经补齐（日期/时间会转毫秒时间戳）
+- Customers 的弱值保护与合并规则已经补齐
+- Customers 当前已经改为：优先按 `客户ID` 命中已有飞书记录；若缺少正式 ID，再回退到 `客户名称 + 客户公司`
+- 当前真实表已经验证过：app 权限写表可能会遇到 `403 Forbidden`，但**用户权限写入链路已跑通**
 
-```
-CRM-Assistant/
-├── agents/
-│   └── openai.yaml                              # Agent 配置
-├── assets/
-│   ├── feishu_raw/                              # 飞书原始会议样本
-│   │   ├── pingan_longxiahezi_need_confirmation.json
-│   │   ├── pingan_longxiahezi_solution_communication.json
-│   │   ├── pingan_longxiahezi_in_progress.json
-│   │   ├── pingan_longxiahezi_pending_close.json
-│   │   ├── pingan_longxiahezi_closed_won.json
-│   │   ├── guojiadianwang_pv_grid_need_confirmation_rich.json
-│   │   └── shanghai_baowu_finetune_observer_low_intent.json
-│   └── few_shot/                                # few-shot 示例
-│       ├── zhongguoyidong_ops_rich.json
-│       └── ningdeshidai_service_rich.json
-├── references/
-│   ├── llm_prompt_template.md                   # Prompt 模板（证据口径 + 判断标准）
-│   ├── llm_output_schema.md                     # 输出 JSON Schema
-│   ├── feishu-bitable-mapping.md                # 飞书两表字段映射
-│   ├── input_schemas.md                         # 输入数据结构
-│   ├── output_schemas.md                        # 输出数据结构
-│   ├── openclaw_user_side_write_prompt.md       # 用户侧 Prompt（飞书写表）
-│   └── user_side_feishu_prompt.md               # 用户侧 Prompt（完整说明）
-├── runtime/                                     # 运行产物（git ignored）
-├── scripts/
-│   └── crm_assistant.py                         # Python CLI 主入口
-├── skills/
-│   └── crm-assistant/
-│       └── SKILL.md                             # OpenClaw Skill 入口契约
-├── .env.example                                 # 环境变量模板（飞书凭证 + Bitable 表配置）
-├── lesson15-lab.md                              # 第 15 节实验手册
-├── requirements.txt
-└── README.md
+---
+
+## 9. 最低回归检查
+
+每次修改后，至少建议执行：
+
+```bash
+python ./scripts/crm_assistant.py --help
+python ./scripts/crm_assistant.py run-sample-tests
+python ./scripts/crm_assistant.py run-feishu-pipeline-tests
 ```
 
-## 相关课程章节
-
-| 前置 | 内容 |
-|---|---|
-| 第 4 节 | 飞书原生深度集成（Bitable 基础操作） |
-| 第 9 节 | SDL 语法与 Skill 开发（SKILL.md 编写） |
-| 第 13 节 | 五步拆解心法与完成态公式 |
-| 第 14 节 | 信号分诊 + 三关口编辑 → 早报管家 |
-
-| 后续 | 复用 |
-|---|---|
-| 第 18 节 | 四段式架构 + 历史强值保护 → 量化投研 |
+说明：
+- 当前仓库默认不再保留 `assets/samples/`，所以 `run-sample-tests` 在无样本时会跳过而不是报错
+- 若需要真正执行样本回归，请先自行补回脱敏样本与对应断言文件
