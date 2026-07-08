@@ -5,6 +5,8 @@
 > 操作方式：全程发给云端 OpenClaw / 龙虾执行
 > 前置条件：OpenClaw 已部署 + Claude Code CLI 可用 + 8511 端口可访问
 
+> ⭐ **审计对象：本手册默认用「样例靶子」跑通、演示与截图** —— 一个埋好风险的小目录，轻量、秒级出结果、8 条 findings 必现、几乎不烧 token（做法见 step 3 的「审计对象二选一 · **A**」）。**想审你真实的 OpenClaw**（更慢、更烧 token，真机也未必有那么多雷）——见「二选一 · **B**」。两条路只差一个 `OPENCLAW_ROOT`。
+
 ---
 
 ## 0. 开始前确认
@@ -13,7 +15,7 @@
 |---|---|---|
 | 1 | 云端 OpenClaw / 龙虾 | 能执行部署和本机 `curl` |
 | 2 | Claude Code CLI | `claude -p "请只回复 ok"` 能返回 |
-| 3 | OpenClaw 真实目录 | 推荐 `/root/.openclaw` |
+| 3 | 审计对象 | **默认样例靶子**（step 3 · A，推荐）；审真实用 `/root/.openclaw`（step 3 · B） |
 | 4 | 课程仓库 | `https://github.com/DjangoPeng/agentic-ai.git`（项目在 `security-guardian/` 子目录） |
 | 5 | 访问端口 | 固定 `8511` |
 
@@ -88,7 +90,7 @@ export CLAUDE_CODE_COMMAND="你的 Claude Code 非交互调用命令，例如 cl
 
 ## 3. 启动服务（发给龙虾）
 
-发送前把 `OPENCLAW_ROOT` 替换为第 4 步真实路径。
+> ⭐ **默认走样例靶子**：先跳到下面「审计对象二选一 · A」把样例建好，再把启动命令里的 `OPENCLAW_ROOT=/root/.openclaw` 换成 `OPENCLAW_ROOT=/root/sg-sample/.openclaw OPENCLAW_INCLUDE_DEFAULT_PATHS=0`。要审真实 OpenClaw 就保持 `/root/.openclaw`（见 B，更慢、更烧 token）。
 
 ```text
 请启动 Security Guardian。
@@ -116,7 +118,7 @@ echo "面板地址：http://$(curl -4 -s --max-time 5 ifconfig.me || curl -4 -s 
 
 ### 审计对象二选一（替换上面命令里的 `OPENCLAW_ROOT`）
 
-**A. 样例靶子（日常测试 / 出截图，推荐）** —— 轻量、秒级、必现 findings、不烧真机 token。先在服务器上造一个“带风险的小目录”（假数据、一眼假）：
+**A. 样例靶子（本手册默认 · 日常测试 / 出截图，推荐）** —— 轻量、秒级、必现 findings、不烧真机 token。先在服务器上造一个“带风险的小目录”（假数据、一眼假）：
 
 ```bash
 LAB=/root/sg-sample/.openclaw
